@@ -1,0 +1,32 @@
+{
+  "resource": "ecommerce",
+  "entities": {
+    "products": {
+      "id": "integer",
+      "name": "string",
+      "description": "string",
+      "price": "float",
+      "stock": "integer",
+      "category": "string",
+      "imageUrl": "string",
+      "createdAt": "datetime"
+    },
+    "users": {
+      "id": "integer",
+      "name": "string",
+      "email": "string",
+      "password": "string",
+      "role": "string",
+      "createdAt": "datetime"
+    },
+    "orders": {
+      "id": "integer",
+      "userId": "integer",
+      "productId": "integer",
+      "quantity": "integer",
+      "totalPrice": "float",
+      "status": "string",
+      "createdAt": "datetime"
+    }
+  }
+}

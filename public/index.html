@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>Universal Backend Generator</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Playfair+Display:ital,wght@0,700;0,900;1,700;1,900&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;700&display=swap"
+    rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#2c583c",
+            "primary-light": "#3a7050",
+            "paper": "#faf8f5",
+            "ink": "#121714",
+            "ink2": "#2d3330",
+            "sep": "#e8e4de",
+            "sep2": "#d4cfc8",
+            "muted": "#7a7670",
+          },
+          fontFamily: {
+            serif: ["Playfair Display", "serif"],
+            mono: ["DM Mono", "monospace"],
+            ui: ["DM Sans", "sans-serif"],
+            display: ["Inter", "sans-serif"],
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    body {
+      background-color: #faf8f5;
+      background-image: radial-gradient(#dedad4 1px, transparent 1px);
+      background-size: 24px 24px;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .top-rule {
+      border-top: 3px solid #121714;
+    }
+
+    .custom-select {
+      appearance: none;
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%232c583c" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>');
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+
+    .file-row-active {
+      background: rgba(44, 88, 60, 0.08);
+      border-left: 2px solid #2c583c;
+    }
+
+    .blinking {
+      animation: blink 1.5s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0.25
+      }
+    }
+
+    .deploy-line::before {
+      content: '';
+      position: absolute;
+      left: -1px;
+      top: 16px;
+      bottom: -8px;
+      width: 1px;
+      background: #e8e4de;
+    }
+
+    .deploy-line-done::before {
+      background: #2c583c;
+    }
+
+    .step-spinner {
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    .progress-anim {
+      background: linear-gradient(90deg, #2c583c 0%, #3a7050 50%, #2c583c 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+
+    @keyframes shimmer {
+      0% {
+        background-position: 200% 0
+      }
+
+      100% {
+        background-position: -200% 0
+      }
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #faf8f5;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #d4cfc8;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+
+<body class="text-ink antialiased min-h-screen">
+  <div class="top-rule"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+     DEPLOY SETUP MODAL
+════════════════════════════════════════════════════════════ -->
+  <div id="deploy-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-6"
+    style="background:rgba(18,23,20,0.55);backdrop-filter:blur(6px)">
+    <div class="bg-white w-full max-w-md border border-sep shadow-2xl fade-in" style="border-radius:2px">
+      <div class="h-[3px] bg-ink"></div>
+      <div class="p-8 border-b border-sep flex items-start justify-between">
+        <div>
+          <span class="font-mono text-[9px] uppercase tracking-[0.25em] text-primary block mb-2">Step 01 / Deploy</span>
+          <h2 class="font-serif text-3xl font-bold italic tracking-tight leading-none">Configure Deployment</h2>
+          <p class="text-sm text-muted mt-3 font-ui leading-relaxed max-w-xs">Push your backend to GitHub and deploy
+            live to Render — both free.</p>
+        </div>
+        <button onclick="closeModal('deploy-modal')" class="text-muted hover:text-ink transition-colors mt-1">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="p-8 space-y-5">
+        <div class="p-4 bg-blue-50 border border-blue-100 text-blue-800 font-mono text-[10px] leading-relaxed"
+          style="border-radius:2px">
+          Need keys? Get a <a href="https://github.com/settings/tokens/new?scopes=repo" target="_blank"
+            class="font-bold underline">GitHub Classic Token</a> (repo scope) and a <a
+            href="https://dashboard.render.com/u/settings#api-keys" target="_blank" class="font-bold underline">Render
+            API Key</a> — both free.
+        </div>
+        <div>
+          <label class="font-mono text-[9px] uppercase tracking-[0.2em] text-muted mb-2 block">Project Name</label>
+          <input id="dep-name" type="text" placeholder="my-awesome-backend"
+            class="w-full border border-sep bg-paper px-4 py-3 font-mono text-sm focus:border-ink focus:ring-0 transition-colors"
+            style="border-radius:2px;outline:none" />
+        </div>
+        <div>
+          <div class="flex justify-between items-end mb-2">
+            <label class="font-mono text-[9px] uppercase tracking-[0.2em] text-muted">GitHub Token (Classic)</label>
+            <a href="https://github.com/settings/tokens/new?scopes=repo" target="_blank"
+              class="font-mono text-[9px] text-primary underline">Get token →</a>
+          </div>
+          <input id="dep-github" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+            class="w-full border border-sep bg-paper px-4 py-3 font-mono text-sm focus:border-ink focus:ring-0 transition-colors"
+            style="border-radius:2px;outline:none" />
+        </div>
+        <div>
+          <div class="flex justify-between items-end mb-2">
+            <label class="font-mono text-[9px] uppercase tracking-[0.2em] text-muted">Render API Key</label>
+            <a href="https://dashboard.render.com/u/settings#api-keys" target="_blank"
+              class="font-mono text-[9px] text-primary underline">API Dashboard →</a>
+          </div>
+          <input id="dep-render" type="password" placeholder="rnd_xxxxxxxxxxxxxxxxxxxx"
+            class="w-full border border-sep bg-paper px-4 py-3 font-mono text-sm focus:border-ink focus:ring-0 transition-colors"
+            style="border-radius:2px;outline:none" />
+        </div>
+      </div>
+      <div class="px-8 pb-8 flex gap-3">
+        <button onclick="closeModal('deploy-modal')"
+          class="flex-1 py-3 border border-sep text-sm font-semibold text-muted hover:border-ink hover:text-ink transition-all"
+          style="border-radius:2px">Cancel</button>
+        <button onclick="startDeploy()"
+          class="flex-[2] py-3 bg-ink text-white text-sm font-bold uppercase tracking-widest hover:bg-ink2 transition-all flex items-center justify-center gap-2"
+          style="border-radius:2px">
+          Deploy Now <span class="material-symbols-outlined text-base">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+     DEPLOY PROGRESS MODAL
+════════════════════════════════════════════════════════════ -->
+  <div id="progress-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-6"
+    style="background:rgba(18,23,20,0.55);backdrop-filter:blur(6px)">
+    <div class="bg-white w-full max-w-md border border-sep shadow-2xl fade-in" style="border-radius:2px">
+      <div class="h-[3px] bg-primary"></div>
+      <div class="p-8 border-b border-sep flex items-start justify-between">
+        <div>
+          <span class="font-mono text-[9px] uppercase tracking-[0.25em] text-primary block mb-2">Step 02 / Deploy</span>
+          <h2 class="font-serif text-3xl font-bold italic tracking-tight leading-none">Deploy Progress</h2>
+        </div>
+        <div class="px-3 py-1 bg-primary/10 border border-primary/20" style="border-radius:2px">
+          <span id="deploy-status-badge" class="font-mono text-[9px] text-primary uppercase tracking-wider italic">In
+            Progress</span>
+        </div>
+      </div>
+      <div class="p-8">
+        <!-- Steps -->
+        <div class="space-y-0 relative ml-2">
+          <!-- Step 1 -->
+          <div class="relative pl-8 pb-7 deploy-line" id="dline-1">
+            <div id="dicon-1"
+              class="absolute -left-[9px] top-0 w-[18px] h-[18px] rounded-full border border-sep bg-paper flex items-center justify-center transition-all">
+              <span class="font-mono text-[8px] text-muted">1</span>
+            </div>
+            <div class="flex items-center justify-between mb-0.5">
+              <p class="text-[10px] font-mono text-muted">01</p>
+              <span id="dlabel-1" class="text-[9px] font-mono uppercase tracking-wider text-muted italic">Pending</span>
+            </div>
+            <p class="text-sm font-semibold uppercase tracking-tight text-ink2">Verify GitHub Account</p>
+            <p id="dsub-1" class="text-[10px] font-mono text-muted mt-0.5"></p>
+          </div>
+          <!-- Step 2 -->
+          <div class="relative pl-8 pb-7 deploy-line" id="dline-2">
+            <div id="dicon-2"
+              class="absolute -left-[9px] top-0 w-[18px] h-[18px] rounded-full border border-sep bg-paper flex items-center justify-center transition-all">
+              <span class="font-mono text-[8px] text-muted">2</span>
+            </div>
+            <div class="flex items-center justify-between mb-0.5">
+              <p class="text-[10px] font-mono text-muted">02</p>
+              <span id="dlabel-2" class="text-[9px] font-mono uppercase tracking-wider text-muted italic">Pending</span>
+            </div>
+            <p class="text-sm font-semibold uppercase tracking-tight text-ink2">Create GitHub Repository</p>
+            <p id="dsub-2" class="text-[10px] font-mono text-muted mt-0.5"></p>
+          </div>
+          <!-- Step 3 -->
+          <div class="relative pl-8 pb-7 deploy-line" id="dline-3">
+            <div id="dicon-3"
+              class="absolute -left-[9px] top-0 w-[18px] h-[18px] rounded-full border border-sep bg-paper flex items-center justify-center transition-all">
+              <span class="font-mono text-[8px] text-muted">3</span>
+            </div>
+            <div class="flex items-center justify-between mb-0.5">
+              <p class="text-[10px] font-mono text-muted">03</p>
+              <span id="dlabel-3" class="text-[9px] font-mono uppercase tracking-wider text-muted italic">Pending</span>
+            </div>
+            <p class="text-sm font-semibold uppercase tracking-tight text-ink2">Push Files to GitHub</p>
+            <p id="dsub-3" class="text-[10px] font-mono text-muted mt-0.5"></p>
+          </div>
+          <!-- Step 4 -->
+          <div class="relative pl-8 pb-7 deploy-line" id="dline-4">
+            <div id="dicon-4"
+              class="absolute -left-[9px] top-0 w-[18px] h-[18px] rounded-full border border-sep bg-paper flex items-center justify-center transition-all">
+              <span class="font-mono text-[8px] text-muted">4</span>
+            </div>
+            <div class="flex items-center justify-between mb-0.5">
+              <p class="text-[10px] font-mono text-muted">04</p>
+              <span id="dlabel-4" class="text-[9px] font-mono uppercase tracking-wider text-muted italic">Pending</span>
+            </div>
+            <p class="text-sm font-semibold uppercase tracking-tight text-ink2">Create Render Service</p>
+            <p id="dsub-4" class="text-[10px] font-mono text-muted mt-0.5"></p>
+          </div>
+          <!-- Step 5 -->
+          <div class="relative pl-8" id="dline-5">
+            <div id="dicon-5"
+              class="absolute -left-[9px] top-0 w-[18px] h-[18px] rounded-full border border-sep bg-paper flex items-center justify-center transition-all">
+              <span class="font-mono text-[8px] text-muted">5</span>
+            </div>
+            <div class="flex items-center justify-between mb-0.5">
+              <p class="text-[10px] font-mono text-muted">05</p>
+              <span id="dlabel-5" class="text-[9px] font-mono uppercase tracking-wider text-muted italic">Pending</span>
+            </div>
+            <p class="text-sm font-semibold uppercase tracking-tight text-ink2">Build & Deploy Live</p>
+            <p id="dsub-5" class="text-[10px] font-mono text-muted mt-0.5"></p>
+          </div>
+        </div>
+
+        <!-- Live URL card (hidden until done) -->
+        <div id="live-card" class="hidden mt-6 bg-paper border border-sep p-5" style="border-radius:2px">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-2 h-2 rounded-full bg-primary blinking"></div>
+            <span class="font-mono text-[9px] uppercase tracking-[0.2em] text-primary">Live on Render</span>
+          </div>
+          <a id="live-url-text" href="#" target="_blank"
+            class="font-mono text-xs text-ink break-all block py-2 border-y border-sep mb-3 hover:text-primary transition-colors"></a>
+          <a id="live-url-btn" href="#" target="_blank"
+            class="w-full flex items-center justify-center gap-2 py-3 bg-ink text-white text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-primary transition-all"
+            style="border-radius:2px">
+            Open Live API <span class="material-symbols-outlined text-sm">open_in_new</span>
+          </a>
+          <a id="live-github-link" href="#" target="_blank"
+            class="block text-center mt-3 font-mono text-[9px] text-muted hover:text-primary transition-colors"></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+     NAVIGATION
+════════════════════════════════════════════════════════════ -->
+  <nav class="bg-paper/90 backdrop-blur-sm border-b border-sep sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+      <div class="flex items-center gap-5">
+        <h1 class="font-serif text-2xl font-bold italic tracking-tight">Universal <span
+            class="not-italic">Backend</span></h1>
+        <div class="flex gap-2">
+          <span
+            class="px-3 py-1 rounded-full border border-sep text-[9px] font-mono uppercase tracking-widest text-muted bg-white">v5.0</span>
+          <span
+            class="px-3 py-1 rounded-full bg-primary/10 text-primary text-[9px] font-mono font-bold uppercase tracking-widest">●
+            Free</span>
+        </div>
+      </div>
+      <div class="hidden md:flex items-center gap-8">
+        <a href="#how" class="text-sm font-medium text-muted hover:text-primary transition-colors">How it works</a>
+        <a href="https://console.groq.com" target="_blank"
+          class="text-sm font-medium text-muted hover:text-primary transition-colors">Get Groq Keys</a>
+        <button onclick="openDeployModal()"
+          class="bg-ink text-white px-6 py-2.5 rounded-full text-sm font-bold hover:bg-primary transition-all flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm">rocket_launch</span> Deploy
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-6 py-12">
+
+    <!-- ═══════════════════════════════════════════════════════════
+       HERO
+  ════════════════════════════════════════════════════════════ -->
+    <header class="mb-16 grid grid-cols-1 lg:grid-cols-3 gap-12 items-end fade-in">
+      <div class="lg:col-span-2">
+        <p class="font-mono text-[9px] uppercase tracking-[0.3em] text-muted mb-5 flex items-center gap-3">
+          <span class="inline-block w-6 h-px bg-muted"></span>AI-Powered Code Generation
+        </p>
+        <h2 class="font-serif text-6xl md:text-7xl lg:text-8xl leading-[0.9] tracking-tighter mb-6">
+          Turn <em>any data</em><br />into a <em>live API</em>.
+        </h2>
+        <p class="text-lg text-muted max-w-md font-ui leading-relaxed">
+          Paste a JSON, CSV, or SQL schema — or drop a URL. AI writes the complete Express.js backend. Deploy to Render
+          in one click.
+        </p>
+      </div>
+      <div class="flex flex-col gap-4">
+        <div
+          class="bg-white border border-sep p-6 flex justify-between items-center group hover:border-primary transition-colors"
+          style="border-radius:3px">
+          <div>
+            <p class="font-mono text-[9px] uppercase tracking-widest text-muted mb-1">Generation Time</p>
+            <p class="font-serif text-4xl font-bold tracking-tight">~30<span
+                class="text-xl text-muted font-normal">s</span></p>
+          </div>
+          <span
+            class="material-symbols-outlined text-3xl text-sep2 group-hover:text-primary transition-colors">speed</span>
+        </div>
+        <div
+          class="bg-white border border-sep p-6 flex justify-between items-center group hover:border-primary transition-colors"
+          style="border-radius:3px">
+          <div>
+            <p class="font-mono text-[9px] uppercase tracking-widest text-muted mb-1">Deployment Cost</p>
+            <p class="font-serif text-4xl font-bold tracking-tight text-primary">Free</p>
+          </div>
+          <span
+            class="material-symbols-outlined text-3xl text-sep2 group-hover:text-primary transition-colors">deployed_code</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ═══════════════════════════════════════════════════════════
+       MAIN WORKSPACE
+  ════════════════════════════════════════════════════════════ -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-0 border border-sep overflow-hidden bg-white shadow-xl mb-6"
+      style="border-radius:3px">
+
+      <!-- ── LEFT: INPUT ────────────────────────────────────────── -->
+      <div class="p-8 border-b lg:border-b-0 lg:border-r border-sep">
+        <div class="flex items-center gap-3 mb-8">
+          <span class="font-serif italic text-5xl text-primary/15 select-none leading-none">01</span>
+          <h3 class="font-mono text-[10px] uppercase tracking-[0.2em] font-bold">Input Configuration</h3>
+        </div>
+
+        <!-- Tab Switcher -->
+        <div class="flex p-1 bg-paper border border-sep mb-7 rounded-full">
+          <button id="tab-file-btn" onclick="switchTab('file')"
+            class="flex-1 py-2 px-4 rounded-full text-xs font-bold transition-all bg-white shadow-sm text-ink border border-sep">
+            Paste File
+          </button>
+          <button id="tab-url-btn" onclick="switchTab('url')"
+            class="flex-1 py-2 px-4 rounded-full text-xs font-bold transition-all text-muted hover:text-ink">
+            From URL
+          </button>
+        </div>
+
+        <!-- File Tab -->
+        <div id="tab-file" class="space-y-5">
+          <div>
+            <label class="font-mono text-[9px] uppercase tracking-widest text-muted mb-2 block">Source File Type</label>
+            <select id="file-type"
+              class="custom-select w-full h-12 px-4 border border-sep bg-paper font-mono text-sm focus:border-primary focus:ring-0 transition-colors"
+              style="border-radius:3px;outline:none">
+              <option value="json">JSON Schema (.json)</option>
+              <option value="csv">CSV Spreadsheet (.csv)</option>
+              <option value="sql">SQL DDL Schema (.sql)</option>
+              <option value="yaml">YAML / OpenAPI (.yaml)</option>
+              <option value="txt">Plain Description (.txt)</option>
+            </select>
+          </div>
+          <div>
+            <label class="font-mono text-[9px] uppercase tracking-widest text-muted mb-2 block">Schema
+              Definition</label>
+            <textarea id="file-content"
+              class="w-full h-56 p-5 border border-sep bg-paper font-mono text-sm focus:border-primary focus:ring-0 transition-colors placeholder:text-muted/50 resize-none"
+              style="border-radius:3px;outline:none" placeholder='// Paste your schema here...
+{
+  "entities": {
+    "users": { "id": "int", "name": "string", "email": "string" },
+    "posts": { "id": "int", "userId": "int", "title": "string" }
+  }
+}'></textarea>
+          </div>
+        </div>
+
+        <!-- URL Tab -->
+        <div id="tab-url" class="hidden space-y-5">
+          <div>
+            <label class="font-mono text-[9px] uppercase tracking-widest text-muted mb-2 block">Website or API
+              URL</label>
+            <input id="url-input" type="text" placeholder="https://jsonplaceholder.typicode.com"
+              class="w-full h-12 px-4 border border-sep bg-paper font-mono text-sm focus:border-primary focus:ring-0 transition-colors"
+              style="border-radius:3px;outline:none" />
+            <div id="url-preview"
+              class="hidden mt-2 p-3 bg-paper border border-sep font-mono text-[10px] text-muted leading-relaxed max-h-24 overflow-hidden"
+              style="border-radius:3px"></div>
+          </div>
+        </div>
+
+        <!-- Provider -->
+        <div class="mt-5 flex items-center justify-between p-4 bg-paper border border-sep" style="border-radius:3px">
+          <div>
+            <p class="text-xs font-bold">Model Provider</p>
+            <p class="font-mono text-[9px] text-muted uppercase tracking-wider mt-0.5" id="provider-label">Groq — Ultra
+              Fast</p>
+          </div>
+          <div class="flex gap-2">
+            <button id="pill-groq" onclick="selectProvider('groq', this)"
+              class="px-4 py-2 rounded-full text-[10px] font-bold bg-ink text-white transition-all">Groq</button>
+            <button id="pill-openrouter" onclick="selectProvider('openrouter', this)"
+              class="px-4 py-2 rounded-full text-[10px] font-bold border border-sep bg-white text-muted hover:border-ink hover:text-ink transition-all">OpenRouter</button>
+          </div>
+        </div>
+
+        <!-- Supabase Toggle -->
+        <div class="mt-5">
+          <button onclick="toggleSupabase()" id="supabase-toggle-btn"
+            class="w-full flex items-center justify-between p-4 bg-paper border border-sep hover:border-primary transition-colors group"
+            style="border-radius:3px">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 flex items-center justify-center" style="border-radius:3px">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C.101 12.888.698 14.08 1.764 14.08h9.21l-.09 8.884c.016.986 1.26 1.41 1.875.637l9.262-11.652c.663-.838.066-2.03-1-2.03h-9.21l.09-8.883z"
+                    fill="#3ECF8E" />
+                </svg>
+              </div>
+              <div class="text-left">
+                <p class="text-xs font-bold">Connect Supabase</p>
+                <p class="font-mono text-[9px] text-muted uppercase tracking-wider mt-0.5" id="supabase-toggle-label">
+                  Optional — use real PostgreSQL database</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="supabase-badge"
+                class="hidden px-2 py-0.5 bg-green-100 text-green-700 font-mono text-[9px] uppercase tracking-wider font-bold"
+                style="border-radius:2px">Connected</span>
+              <span id="supabase-chevron"
+                class="material-symbols-outlined text-muted text-base transition-transform">expand_more</span>
+            </div>
+          </button>
+
+          <!-- Supabase panel -->
+          <div id="supabase-panel" class="hidden border border-t-0 border-sep bg-white p-5 space-y-4"
+            style="border-radius:0 0 3px 3px">
+            <!-- Info note -->
+            <div class="flex gap-3 p-3 bg-green-50 border border-green-100" style="border-radius:3px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="flex-shrink-0 mt-0.5">
+                <path
+                  d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C.101 12.888.698 14.08 1.764 14.08h9.21l-.09 8.884c.016.986 1.26 1.41 1.875.637l9.262-11.652c.663-.838.066-2.03-1-2.03h-9.21l.09-8.883z"
+                  fill="#3ECF8E" />
+              </svg>
+              <div>
+                <p class="font-mono text-[10px] text-green-800 leading-relaxed">
+                  With Supabase connected, your backend will use <strong>real PostgreSQL</strong> instead of in-memory
+                  data. Data persists across restarts.
+                  Get your keys from <a href="https://supabase.com/dashboard/project/_/settings/api" target="_blank"
+                    class="underline font-bold">Supabase Dashboard → Settings → API</a>.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label class="font-mono text-[9px] uppercase tracking-widest text-muted mb-2 block">Project URL</label>
+              <input id="sb-url" type="text" placeholder="https://xxxxxxxxxxxx.supabase.co"
+                class="w-full h-11 px-4 border border-sep bg-paper font-mono text-xs focus:border-primary focus:ring-0 transition-colors"
+                style="border-radius:3px;outline:none" oninput="updateSupabaseStatus()" />
+            </div>
+            <div>
+              <div class="flex justify-between items-end mb-2">
+                <label class="font-mono text-[9px] uppercase tracking-widest text-muted">Anon / Public Key</label>
+                <span class="font-mono text-[9px] text-muted">safe to expose</span>
+              </div>
+              <input id="sb-anon" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                class="w-full h-11 px-4 border border-sep bg-paper font-mono text-xs focus:border-primary focus:ring-0 transition-colors"
+                style="border-radius:3px;outline:none" oninput="updateSupabaseStatus()" />
+            </div>
+            <div>
+              <div class="flex justify-between items-end mb-2">
+                <label class="font-mono text-[9px] uppercase tracking-widest text-muted">Service Role Key</label>
+                <span class="font-mono text-[9px] text-red-400 font-bold">⚠ keep secret</span>
+              </div>
+              <input id="sb-service" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                class="w-full h-11 px-4 border border-sep bg-paper font-mono text-xs focus:border-primary focus:ring-0 transition-colors"
+                style="border-radius:3px;outline:none" oninput="updateSupabaseStatus()" />
+              <p class="font-mono text-[9px] text-muted mt-1.5 leading-relaxed">The service key bypasses Row Level
+                Security — only used server-side, never exposed to clients.</p>
+            </div>
+
+            <!-- Schema hint -->
+            <div class="p-3 bg-paper border border-sep" style="border-radius:3px">
+              <p class="font-mono text-[9px] text-muted leading-relaxed">
+                💡 After generating, run <strong>supabase/schema.sql</strong> in your Supabase SQL Editor to create the
+                tables automatically.
+              </p>
+            </div>
+
+            <button onclick="clearSupabase()"
+              class="font-mono text-[9px] text-muted hover:text-red-500 transition-colors uppercase tracking-wider">
+              ✕ Disconnect Supabase
+            </button>
+          </div>
+        </div>
+
+        <!-- Generate Button -->
+        <button id="gen-btn" onclick="generate()"
+          class="mt-5 w-full h-14 bg-ink text-white font-bold text-sm tracking-widest uppercase hover:bg-primary transition-all flex items-center justify-center gap-3 rounded-full"
+          style="">
+          <span id="gen-icon" class="material-symbols-outlined text-lg">bolt</span>
+          <span id="gen-text">Generate Backend</span>
+        </button>
+      </div>
+
+      <!-- ── RIGHT: OUTPUT ───────────────────────────────────────── -->
+      <!-- PLACEHOLDER STATE -->
+      <div id="output-placeholder" class="p-8 bg-paper/40 flex flex-col min-h-[520px]">
+        <div class="flex items-center gap-3 mb-8">
+          <span class="font-serif italic text-5xl text-primary/15 select-none leading-none">02</span>
+          <h3 class="font-mono text-[10px] uppercase tracking-[0.2em] font-bold">System Output</h3>
+        </div>
+        <div class="flex-1 flex flex-col items-center justify-center text-center relative">
+          <span
+            class="absolute font-serif text-[18rem] leading-none text-ink/[0.025] select-none pointer-events-none top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">02</span>
+          <div class="relative z-10 flex flex-col items-center gap-4">
+            <div
+              class="w-16 h-16 rounded-full border border-sep flex items-center justify-center bg-white shadow-sm animate-pulse">
+              <span class="material-symbols-outlined text-primary/30 text-3xl">terminal</span>
+            </div>
+            <h4 class="font-serif text-2xl italic tracking-tight">Waiting for input...</h4>
+            <p class="text-sm text-muted max-w-[220px] font-ui leading-relaxed">Provide a schema and click generate.
+              Your production-ready backend code will appear here.</p>
+          </div>
+        </div>
+        <div class="mt-auto pt-6 border-t border-sep flex items-center justify-between">
+          <div class="flex gap-2">
+            <div class="w-2 h-2 rounded-full bg-primary/20"></div>
+            <div class="w-2 h-2 rounded-full bg-primary/20"></div>
+            <div class="w-2 h-2 rounded-full bg-primary/20"></div>
+          </div>
+          <p class="font-mono text-[9px] text-muted/50 uppercase tracking-widest italic">Standing by</p>
+        </div>
+      </div>
+
+      <!-- LOADING STATE -->
+      <div id="output-loading" class="hidden p-8 bg-paper/40 flex flex-col min-h-[520px]">
+        <div class="flex items-center gap-3 mb-8">
+          <span class="font-serif italic text-5xl text-primary/15 select-none leading-none">02</span>
+          <h3 class="font-mono text-[10px] uppercase tracking-[0.2em] font-bold">System Output</h3>
+        </div>
+        <!-- Progress bar -->
+        <div class="mb-6">
+          <div class="h-[2px] bg-sep overflow-hidden" style="border-radius:1px">
+            <div id="prog-fill" class="h-full progress-anim transition-all duration-500" style="width:0%"></div>
+          </div>
+          <p id="prog-label" class="font-mono text-[10px] text-muted mt-2">Initialising...</p>
+        </div>
+        <div class="flex-1 flex flex-col items-center justify-center gap-5">
+          <div class="w-14 h-14 rounded-full border border-sep flex items-center justify-center bg-white">
+            <svg class="step-spinner w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z" />
+            </svg>
+          </div>
+          <p id="loading-msg" class="font-serif text-2xl italic tracking-tight text-center">Generating your backend...
+          </p>
+          <p class="font-mono text-[10px] text-muted text-center max-w-xs">Groq AI is analysing your schema and writing
+            routes, controllers, middleware and more.</p>
+        </div>
+      </div>
+
+      <!-- GENERATED STATE -->
+      <div id="output-generated" class="hidden flex flex-col min-h-[520px] bg-[#1a211e]">
+        <!-- Header -->
+        <div class="px-8 pt-8 pb-0">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined text-primary fill-1 text-xl">check_circle</span>
+              <h3 class="text-base font-semibold text-white font-display">Backend <span
+                  class="font-bold">Generated</span></h3>
+            </div>
+            <span id="build-id" class="font-mono text-[9px] text-white/30 tracking-tighter"></span>
+          </div>
+          <!-- 1px green line -->
+          <div class="h-[1px] bg-white/10 mb-6 overflow-hidden">
+            <div class="h-full bg-primary" style="width:100%"></div>
+          </div>
+          <!-- Metrics -->
+          <div class="grid grid-cols-3 border border-white/8 divide-x divide-white/8 mb-6">
+            <div class="p-5">
+              <p class="font-mono text-[9px] uppercase tracking-widest text-white/40 mb-1">Files</p>
+              <p id="m-files" class="font-serif text-4xl text-white">—</p>
+            </div>
+            <div class="p-5">
+              <p class="font-mono text-[9px] uppercase tracking-widest text-white/40 mb-1">Lines</p>
+              <p id="m-lines" class="font-serif text-4xl text-white">—</p>
+            </div>
+            <div class="p-5">
+              <p class="font-mono text-[9px] uppercase tracking-widest text-white/40 mb-1">Seconds</p>
+              <p id="m-time" class="font-serif text-4xl text-white">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- File Explorer + Code Preview -->
+        <div class="flex flex-1 overflow-hidden border-t border-white/8">
+          <!-- File tree -->
+          <aside class="w-52 border-r border-white/8 flex flex-col flex-shrink-0 overflow-y-auto">
+            <div class="px-4 pt-4 pb-2">
+              <p class="font-mono text-[8px] uppercase tracking-[0.2em] text-white/30">Project Structure</p>
+            </div>
+            <div id="file-tree" class="flex-1 space-y-0 py-1"></div>
+          </aside>
+          <!-- Code editor -->
+          <div class="flex-1 flex flex-col overflow-hidden">
+            <div id="code-header"
+              class="px-4 py-2.5 border-b border-white/8 bg-black/20 flex items-center justify-between flex-shrink-0">
+              <div class="flex items-center gap-3">
+                <span id="code-fname" class="font-mono text-[10px] text-white/60">index.js</span>
+              </div>
+              <div class="flex gap-1.5">
+                <div class="w-2 h-2 rounded-full bg-white/10"></div>
+                <div class="w-2 h-2 rounded-full bg-white/10"></div>
+                <div class="w-2 h-2 rounded-full bg-white/10"></div>
+              </div>
+            </div>
+            <pre id="code-preview"
+              class="flex-1 overflow-auto p-5 font-mono text-[11px] text-white/70 leading-relaxed bg-black/30"></pre>
+          </div>
+        </div>
+
+        <!-- Actions footer -->
+        <div class="px-8 py-5 border-t border-white/8 bg-black/20 flex items-center justify-between flex-shrink-0">
+          <div>
+            <p class="font-mono text-[9px] uppercase tracking-widest text-white/40 font-bold">Export Options</p>
+            <p class="font-mono text-[9px] text-white/25 mt-0.5">Ready for production deployment</p>
+          </div>
+          <div class="flex gap-3">
+            <button onclick="downloadZip()"
+              class="px-6 h-11 flex items-center gap-2 border border-white/20 hover:border-white text-white text-[10px] font-bold uppercase tracking-widest transition-all"
+              style="border-radius:2px">
+              <span class="material-symbols-outlined text-base">download</span> Download ZIP
+            </button>
+            <button onclick="openDeployModal()"
+              class="px-6 h-11 flex items-center gap-2 bg-primary hover:bg-primary-light text-white text-[10px] font-bold uppercase tracking-widest transition-all"
+              style="border-radius:2px">
+              <span class="material-symbols-outlined text-base">rocket_launch</span> Deploy to Render
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ERROR STATE -->
+      <div id="output-error"
+        class="hidden p-8 bg-red-50/40 flex flex-col min-h-[520px] items-center justify-center text-center gap-4">
+        <span class="material-symbols-outlined text-5xl text-red-300">error</span>
+        <h4 class="font-serif text-2xl italic text-red-900">Generation Failed</h4>
+        <p id="error-msg" class="font-mono text-xs text-red-600 max-w-xs leading-relaxed"></p>
+        <button onclick="resetToPlaceholder()"
+          class="mt-2 px-6 py-3 bg-ink text-white text-xs font-bold uppercase tracking-widest rounded-full hover:bg-primary transition-all">Try
+          Again</button>
+      </div>
+
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════
+       HOW IT WORKS
+  ════════════════════════════════════════════════════════════ -->
+    <section id="how" class="mt-20">
+      <div class="flex items-baseline gap-6 mb-10">
+        <h3 class="font-serif text-5xl font-bold tracking-tight">How it works</h3>
+        <span class="font-mono text-[9px] text-muted uppercase tracking-[0.2em]">— four steps</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div
+          class="relative p-7 border border-sep bg-white overflow-hidden group hover:border-primary transition-colors"
+          style="border-radius:3px">
+          <span
+            class="absolute -top-3 -right-2 font-serif text-9xl italic text-ink/[0.03] group-hover:text-primary/[0.05] transition-colors select-none">01</span>
+          <span class="material-symbols-outlined text-primary/40 mb-4 block text-2xl">upload_file</span>
+          <h4 class="font-bold text-xs mb-2 uppercase tracking-widest">Paste Schema</h4>
+          <p class="text-sm text-muted leading-relaxed">Drop in JSON, CSV, SQL, or a URL. We analyse your data structure
+            instantly.</p>
+        </div>
+        <div
+          class="relative p-7 border border-sep bg-white overflow-hidden group hover:border-primary transition-colors"
+          style="border-radius:3px">
+          <span
+            class="absolute -top-3 -right-2 font-serif text-9xl italic text-ink/[0.03] group-hover:text-primary/[0.05] transition-colors select-none">02</span>
+          <span class="material-symbols-outlined text-primary/40 mb-4 block text-2xl">smart_toy</span>
+          <h4 class="font-bold text-xs mb-2 uppercase tracking-widest">AI Generates</h4>
+          <p class="text-sm text-muted leading-relaxed">Groq AI reads your schema and writes a complete Express.js
+            backend with all files.</p>
+        </div>
+        <div
+          class="relative p-7 border border-sep bg-white overflow-hidden group hover:border-primary transition-colors"
+          style="border-radius:3px">
+          <span
+            class="absolute -top-3 -right-2 font-serif text-9xl italic text-ink/[0.03] group-hover:text-primary/[0.05] transition-colors select-none">03</span>
+          <span class="material-symbols-outlined text-primary/40 mb-4 block text-2xl">preview</span>
+          <h4 class="font-bold text-xs mb-2 uppercase tracking-widest">Preview & Export</h4>
+          <p class="text-sm text-muted leading-relaxed">Browse every generated file. Download as a ZIP and run with npm
+            install.</p>
+        </div>
+        <div
+          class="relative p-7 border border-sep bg-white overflow-hidden group hover:border-primary transition-colors"
+          style="border-radius:3px">
+          <span
+            class="absolute -top-3 -right-2 font-serif text-9xl italic text-ink/[0.03] group-hover:text-primary/[0.05] transition-colors select-none">04</span>
+          <span class="material-symbols-outlined text-primary/40 mb-4 block text-2xl">rocket_launch</span>
+          <h4 class="font-bold text-xs mb-2 uppercase tracking-widest">Deploy Live</h4>
+          <p class="text-sm text-muted leading-relaxed">One click pushes to GitHub and deploys on Render. Get a live
+            public URL free.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-sep mt-20">
+    <div class="max-w-7xl mx-auto px-6 py-10 flex flex-col md:flex-row justify-between items-center gap-6">
+      <div class="flex items-center gap-4">
+        <span class="font-serif italic text-lg font-bold">Universal Backend</span>
+        <span class="text-muted text-[9px] font-mono">Powered by Groq AI & Render</span>
+      </div>
+      <div class="flex gap-8">
+        <a href="https://console.groq.com" target="_blank"
+          class="font-mono text-[9px] uppercase tracking-widest text-muted hover:text-primary transition-colors">Groq
+          Console</a>
+        <a href="https://dashboard.render.com" target="_blank"
+          class="font-mono text-[9px] uppercase tracking-widest text-muted hover:text-primary transition-colors">Render</a>
+        <a href="https://github.com" target="_blank"
+          class="font-mono text-[9px] uppercase tracking-widest text-muted hover:text-primary transition-colors">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Background decorative circles -->
+  <div class="fixed top-0 right-0 w-1/2 h-screen pointer-events-none -z-10 overflow-hidden opacity-30">
+    <div class="absolute top-20 right-[-10%] w-[700px] h-[700px] border border-primary/8 rounded-full rotate-45"></div>
+    <div class="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] border border-ink/5 rounded-full -rotate-12">
+    </div>
+  </div>
+
+  <script>
+    // ── State ──────────────────────────────────────────────────────────────
+    let currentTab = 'file';
+    let currentProvider = 'groq';
+    let generatedFiles = {};
+    let startTime = 0;
+
+    // ── Tab Switching ──────────────────────────────────────────────────────
+    function switchTab(t) {
+      currentTab = t;
+      const fileEl = document.getElementById('tab-file');
+      const urlEl = document.getElementById('tab-url');
+      const fileBtn = document.getElementById('tab-file-btn');
+      const urlBtn = document.getElementById('tab-url-btn');
+      if (t === 'file') {
+        fileEl.classList.remove('hidden');
+        urlEl.classList.add('hidden');
+        fileBtn.classList.add('bg-white', 'shadow-sm', 'text-ink', 'border', 'border-sep');
+        fileBtn.classList.remove('text-muted');
+        urlBtn.classList.remove('bg-white', 'shadow-sm', 'text-ink', 'border', 'border-sep');
+        urlBtn.classList.add('text-muted');
+      } else {
+        urlEl.classList.remove('hidden');
+        fileEl.classList.add('hidden');
+        urlBtn.classList.add('bg-white', 'shadow-sm', 'text-ink', 'border', 'border-sep');
+        urlBtn.classList.remove('text-muted');
+        fileBtn.classList.remove('bg-white', 'shadow-sm', 'text-ink', 'border', 'border-sep');
+        fileBtn.classList.add('text-muted');
+      }
+    }
+
+    // ── Provider ───────────────────────────────────────────────────────────
+    function selectProvider(p, el) {
+      currentProvider = p;
+      document.getElementById('pill-groq').className = 'px-4 py-2 rounded-full text-[10px] font-bold border border-sep bg-white text-muted hover:border-ink hover:text-ink transition-all';
+      document.getElementById('pill-openrouter').className = 'px-4 py-2 rounded-full text-[10px] font-bold border border-sep bg-white text-muted hover:border-ink hover:text-ink transition-all';
+      el.className = 'px-4 py-2 rounded-full text-[10px] font-bold bg-ink text-white transition-all';
+      document.getElementById('provider-label').textContent = p === 'groq' ? 'Groq — Ultra Fast' : 'OpenRouter — Multi-Model';
+    }
+
+    // ── Output State Management ────────────────────────────────────────────
+    function showState(state) {
+      ['placeholder', 'loading', 'generated', 'error'].forEach(s => {
+        const el = document.getElementById('output-' + s);
+        if (el) el.classList.add('hidden');
+      });
+      const target = document.getElementById('output-' + state);
+      if (target) {
+        target.classList.remove('hidden');
+        if (state === 'generated') target.style.display = 'flex';
+      }
+    }
+
+    function resetToPlaceholder() { showState('placeholder'); }
+
+    // ── Supabase ───────────────────────────────────────────────────────────
+    let supabaseOpen = false;
+
+    function toggleSupabase() {
+      supabaseOpen = !supabaseOpen;
+      const panel = document.getElementById('supabase-panel');
+      const chevron = document.getElementById('supabase-chevron');
+      panel.classList.toggle('hidden', !supabaseOpen);
+      chevron.style.transform = supabaseOpen ? 'rotate(180deg)' : '';
+    }
+
+    function updateSupabaseStatus() {
+      const url = document.getElementById('sb-url').value.trim();
+      const anon = document.getElementById('sb-anon').value.trim();
+      const badge = document.getElementById('supabase-badge');
+      const label = document.getElementById('supabase-toggle-label');
+      if (url && anon) {
+        badge.classList.remove('hidden');
+        label.textContent = 'Connected — using PostgreSQL';
+        label.style.color = '#16a34a';
+      } else {
+        badge.classList.add('hidden');
+        label.textContent = 'Optional — use real PostgreSQL database';
+        label.style.color = '';
+      }
+    }
+
+    function clearSupabase() {
+      ['sb-url', 'sb-anon', 'sb-service'].forEach(id => document.getElementById(id).value = '');
+      updateSupabaseStatus();
+      supabaseOpen = false;
+      document.getElementById('supabase-panel').classList.add('hidden');
+      document.getElementById('supabase-chevron').style.transform = '';
+    }
+
+    function getSupabaseConfig() {
+      const url = document.getElementById('sb-url').value.trim();
+      const anonKey = document.getElementById('sb-anon').value.trim();
+      const serviceKey = document.getElementById('sb-service').value.trim();
+      if (!url || !anonKey) return null;
+      return { url, anonKey, serviceKey };
+    }
+
+    // ── Generate Button State ──────────────────────────────────────────────
+    function setGenBtn(loading) {
+      const btn = document.getElementById('gen-btn');
+      const icon = document.getElementById('gen-icon');
+      const text = document.getElementById('gen-text');
+      btn.disabled = loading;
+      if (loading) {
+        icon.textContent = 'hourglass_top';
+        text.textContent = 'Generating...';
+        btn.classList.add('opacity-70', 'cursor-not-allowed');
+      } else {
+        icon.textContent = 'bolt';
+        text.textContent = 'Generate Backend';
+        btn.classList.remove('opacity-70', 'cursor-not-allowed');
+      }
+    }
+
+    function setProgress(pct, label) {
+      document.getElementById('prog-fill').style.width = pct + '%';
+      document.getElementById('prog-label').textContent = label;
+    }
+
+    // ── File Icon ──────────────────────────────────────────────────────────
+    function fileIcon(name) {
+      if (name.includes('route')) return 'alt_route';
+      if (name.includes('controller')) return 'settings';
+      if (name.includes('middleware')) return 'tune';
+      if (name.includes('index')) return 'play_arrow';
+      if (name.includes('package')) return 'inventory_2';
+      if (name.includes('.env')) return 'key';
+      if (name.endsWith('.md')) return 'description';
+      if (name.endsWith('.yaml') || name.endsWith('.yml')) return 'code';
+      if (name.endsWith('.sql')) return 'table_chart';
+      if (name.includes('supabase')) return 'database';
+      return 'draft';
+    }
+
+    // ── Build File Tree ────────────────────────────────────────────────────
+    function buildFileTree(files) {
+      const tree = document.getElementById('file-tree');
+      tree.innerHTML = '';
+      Object.entries(files).forEach(([path, content], i) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2 pl-4 pr-3 py-2 text-white/50 hover:bg-white/5 cursor-pointer text-[11px] font-mono transition-colors border-l-2 border-transparent';
+        row.dataset.path = path;
+        row.innerHTML = `
+      <span class="material-symbols-outlined text-xs flex-shrink-0" style="font-size:14px">${fileIcon(path)}</span>
+      <span class="truncate flex-1">${path}</span>
+    `;
+        row.onclick = () => previewFile(path, content, row);
+        tree.appendChild(row);
+        if (i === 0) setTimeout(() => previewFile(path, content, row), 50);
+      });
+    }
+
+    // ── Preview File ───────────────────────────────────────────────────────
+    function previewFile(path, content, row) {
+      document.querySelectorAll('#file-tree div').forEach(r => {
+        r.classList.remove('bg-white/8', 'text-white', 'border-l-primary');
+        r.classList.add('text-white/50', 'border-transparent');
+        r.style.borderLeftColor = '';
+      });
+      row.classList.remove('text-white/50', 'border-transparent');
+      row.classList.add('bg-white/8', 'text-white');
+      row.style.borderLeftColor = '#2c583c';
+      document.getElementById('code-fname').textContent = path;
+      document.getElementById('code-preview').textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+    }
+
+    // ── Main Generate ──────────────────────────────────────────────────────
+    async function generate() {
+      const content = document.getElementById('file-content').value.trim();
+      const url = document.getElementById('url-input').value.trim();
+      if (currentTab === 'file' && !content) return alert('Please paste some schema content first.');
+      if (currentTab === 'url' && !url) return alert('Please enter a URL.');
+
+      setGenBtn(true);
+      startTime = Date.now();
+      showState('loading');
+      setProgress(8, 'Sending to AI...');
+
+      const steps = [
+        [18, 'Analysing your schema...'],
+        [38, 'Generating routes & controllers...'],
+        [58, 'Writing middleware & models...'],
+        [76, 'Finalising file structure...'],
+        [90, 'Almost there...'],
+      ];
+      let si = 0;
+      const pi = setInterval(() => {
+        if (si < steps.length) {
+          const [p, l] = steps[si++];
+          setProgress(p, l);
+          document.getElementById('loading-msg').textContent = l;
+        }
+      }, 3200);
+
+      try {
+        const sbConfig = getSupabaseConfig();
+        const body = currentTab === 'file'
+          ? { type: 'file', content, fileType: document.getElementById('file-type').value, fileName: 'input', provider: currentProvider, supabase: sbConfig }
+          : { type: 'url', url, provider: currentProvider, supabase: sbConfig };
+
+        const res = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        clearInterval(pi);
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Generation failed');
+
+        setProgress(100, 'Done!');
+        await new Promise(r => setTimeout(r, 400));
+
+        generatedFiles = data.files;
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        const lines = Object.values(generatedFiles).reduce((a, c) => a + (typeof c === 'string' ? c.split('\n').length : 0), 0);
+        const fileCount = Object.keys(generatedFiles).length;
+
+        document.getElementById('m-files').textContent = fileCount;
+        document.getElementById('m-lines').textContent = lines > 999 ? (lines / 1000).toFixed(1) + 'k' : lines;
+        document.getElementById('m-time').textContent = elapsed;
+        document.getElementById('build-id').textContent = 'BUILD_ID: ' + Math.random().toString(36).slice(2, 8).toUpperCase();
+
+        buildFileTree(generatedFiles);
+        showState('generated');
+
+      } catch (err) {
+        clearInterval(pi);
+        document.getElementById('error-msg').textContent = err.message;
+        showState('error');
+      }
+
+      setGenBtn(false);
+    }
+
+    // ── Download ZIP ───────────────────────────────────────────────────────
+    async function downloadZip() {
+      if (!Object.keys(generatedFiles).length) return;
+      const zip = new JSZip();
+      const folder = zip.folder('generated-backend');
+      Object.entries(generatedFiles).forEach(([p, c]) => folder.file(p, typeof c === 'string' ? c : JSON.stringify(c, null, 2)));
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'generated-backend.zip'; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // ── Deploy Modal ───────────────────────────────────────────────────────
+    function openDeployModal() {
+      if (!Object.keys(generatedFiles).length) return alert('Please generate a backend first.');
+      const d = new Date();
+      document.getElementById('dep-name').value = 'backend-' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+      document.getElementById('live-card').classList.add('hidden');
+      showModal('deploy-modal');
+    }
+
+    function showModal(id) {
+      const el = document.getElementById(id);
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+    }
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      el.classList.add('hidden');
+      el.classList.remove('flex');
+    }
+
+    // ── Deploy Steps UI ────────────────────────────────────────────────────
+    function setDeployStep(n, state, sub) {
+      const icon = document.getElementById('dicon-' + n);
+      const label = document.getElementById('dlabel-' + n);
+      const subEl = document.getElementById('dsub-' + n);
+      const line = document.getElementById('dline-' + n);
+
+      if (state === 'done') {
+        icon.className = 'absolute -left-[9px] top-0 w-[18px] h-[18px] rounded-full bg-primary flex items-center justify-center transition-all';
+        icon.innerHTML = '<span class="material-symbols-outlined text-white" style="font-size:10px;font-variation-settings:\'FILL\' 1">check</span>';
+        label.textContent = 'Success';
+        label.className = 'text-[9px] font-mono uppercase tracking-wider text-primary italic';
+        if (line) { line.classList.add('deploy-line-done'); }
+      } else if (state === 'active') {
+        icon.className = 'absolute -left-[9px] top-0 w-[18px] h-[18px] rounded-full bg-ink flex items-center justify-center transition-all animate-pulse';
+        icon.innerHTML = '<div class="w-2 h-2 rounded-full bg-white"></div>';
+        label.textContent = 'Processing...';
+        label.className = 'text-[9px] font-mono uppercase tracking-wider text-ink italic';
+      } else if (state === 'error') {
+        icon.className = 'absolute -left-[9px] top-0 w-[18px] h-[18px] rounded-full bg-red-500 flex items-center justify-center transition-all';
+        icon.innerHTML = '<span class="material-symbols-outlined text-white" style="font-size:10px">close</span>';
+        label.textContent = 'Failed';
+        label.className = 'text-[9px] font-mono uppercase tracking-wider text-red-500 italic';
+      }
+      if (subEl && sub) subEl.textContent = sub;
+    }
+
+    // ── Start Deploy ───────────────────────────────────────────────────────
+    async function startDeploy() {
+      const repoName = document.getElementById('dep-name').value.trim();
+      const githubToken = document.getElementById('dep-github').value.trim();
+      const renderToken = document.getElementById('dep-render').value.trim();
+      if (!repoName || !githubToken || !renderToken) return alert('Please fill in all three fields.');
+
+      closeModal('deploy-modal');
+      showModal('progress-modal');
+      document.getElementById('live-card').classList.add('hidden');
+      document.getElementById('deploy-status-badge').textContent = 'In Progress';
+
+      // Reset all steps
+      [1, 2, 3, 4, 5].forEach(i => {
+        const icon = document.getElementById('dicon-' + i);
+        const label = document.getElementById('dlabel-' + i);
+        const sub = document.getElementById('dsub-' + i);
+        icon.className = 'absolute -left-[9px] top-0 w-[18px] h-[18px] rounded-full border border-sep bg-paper flex items-center justify-center transition-all';
+        icon.innerHTML = `<span class="font-mono text-[8px] text-muted">${i}</span>`;
+        label.textContent = 'Pending';
+        label.className = 'text-[9px] font-mono uppercase tracking-wider text-muted italic';
+        if (sub) sub.textContent = '';
+        const line = document.getElementById('dline-' + i);
+        if (line) line.classList.remove('deploy-line-done');
+      });
+
+      setDeployStep(1, 'active', 'Connecting...');
+
+      try {
+        const res = await fetch('/api/deploy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files: generatedFiles, githubToken, renderToken, repoName })
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop();
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const msg = JSON.parse(line);
+              if (msg.error) {
+                [1, 2, 3, 4, 5].forEach(i => {
+                  const el = document.getElementById('dicon-' + i);
+                  if (el && el.className.includes('animate-pulse')) setDeployStep(i, 'error', msg.error);
+                });
+                document.getElementById('deploy-status-badge').textContent = 'Failed';
+                return;
+              }
+              if (msg.step) {
+                for (let i = 1; i < msg.step; i++) setDeployStep(i, 'done', 'Complete');
+                if (!msg.done) setDeployStep(msg.step, 'active', msg.message);
+                else setDeployStep(msg.step, 'done', 'Complete');
+              }
+              if (msg.done && msg.liveUrl) {
+                document.getElementById('deploy-status-badge').textContent = 'Live ✓';
+                const card = document.getElementById('live-card');
+                card.classList.remove('hidden');
+                const urlText = document.getElementById('live-url-text');
+                const urlBtn = document.getElementById('live-url-btn');
+                const ghLink = document.getElementById('live-github-link');
+                urlText.textContent = msg.liveUrl;
+                urlText.href = msg.liveUrl;
+                urlBtn.href = msg.liveUrl;
+                ghLink.innerHTML = `GitHub: <a href="${msg.githubUrl}" target="_blank" class="underline hover:text-primary">${msg.githubUrl}</a>`;
+              }
+            } catch (_) { }
+          }
+        }
+      } catch (err) {
+        document.getElementById('live-card').classList.remove('hidden');
+        document.getElementById('live-url-text').textContent = '❌ ' + err.message;
+        document.getElementById('live-url-btn').style.display = 'none';
+        document.getElementById('deploy-status-badge').textContent = 'Failed';
+      }
+    }
+
+    // ── URL Preview ────────────────────────────────────────────────────────
+    document.getElementById('url-input')?.addEventListener('blur', async function () {
+      const url = this.value.trim();
+      if (!url) return;
+      const pv = document.getElementById('url-preview');
+      pv.classList.remove('hidden');
+      pv.textContent = 'Fetching preview...';
+      try {
+        const res = await fetch('/api/preview-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+        const data = await res.json();
+        pv.textContent = data.preview || data.error;
+      } catch { pv.textContent = 'Could not fetch preview.'; }
+    });
+
+    // ── Overlay close on click ─────────────────────────────────────────────
+    ['deploy-modal', 'progress-modal'].forEach(id => {
+      document.getElementById(id).addEventListener('click', function (e) {
+        if (e.target === this) closeModal(id);
+      });
+    });
+  </script>
+</body>
+
+</html>
