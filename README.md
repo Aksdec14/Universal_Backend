@@ -150,6 +150,4 @@ generated-backend/
 
 ---
 
-## 📄 License
 
-MIT
